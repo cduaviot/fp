@@ -1,4 +1,4 @@
-name: Build Image and Publish to GPR
+name: Build Image and Package for Download
 
 on:
   release:
@@ -38,35 +38,41 @@ jobs:
             echo "TAG_NAME=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
           fi
 
-      - name: Login to the GPR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GPR_TOKEN }}
-
       # prepare image tags
       - name: Prepare Image Tags
         run: |
           echo "DOCKERFILE_FRPC_PATH=dockerfiles/Dockerfile-for-frpc" >> $GITHUB_ENV
           echo "DOCKERFILE_FRPS_PATH=dockerfiles/Dockerfile-for-frps" >> $GITHUB_ENV
-          echo "TAG_FRPC=ghcr.io/fatedier/frpc:${{ env.TAG_NAME }}" >> $GITHUB_ENV
-          echo "TAG_FRPS=ghcr.io/fatedier/frps:${{ env.TAG_NAME }}" >> $GITHUB_ENV
+          echo "TAG_FRPC=fatedier/frpc:${{ env.TAG_NAME }}" >> $GITHUB_ENV
+          echo "TAG_FRPS=fatedier/frps:${{ env.TAG_NAME }}" >> $GITHUB_ENV
 
-      - name: Build and push frpc
+      - name: Build frpc
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ./dockerfiles/Dockerfile-for-frpc
           platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
-          push: true
+          push: false
           tags: ${{ env.TAG_FRPC }}
 
-      - name: Build and push frps
+      - name: Build frps
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./dockerfiles/Dockerfile-for-frps
           platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
-          push: true
+          push: false
           tags: ${{ env.TAG_FRPS }}
+
+      - name: Save Docker images as tar
+        run: |
+          docker save fatedier/frpc:${{ env.TAG_NAME }} > frpc.tar
+          docker save fatedier/frps:${{ env.TAG_NAME }} > frps.tar
+
+      - name: Upload images as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-images
+          path: |
+            frpc.tar
+            frps.tar
